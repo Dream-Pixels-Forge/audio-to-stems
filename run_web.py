@@ -11,8 +11,7 @@ import time
 import threading
 import torch
 from web_app import app, socketio
-from waitress import serve
-import socketio as sio
+import subprocess
 
 # Set environment variables for better performance
 os.environ['CUDA_LAUNCH_BLOCKING'] = '0'
@@ -52,17 +51,23 @@ def main():
 
     try:
         if is_production:
-            # In production, use Waitress for WSGI and Socket.IO with threading
+            # In production, use Gunicorn with eventlet
             print(f"🚀 Starting production server on port {port}...")
-
-            # Create a new Socket.IO server instance
-            sio_server = sio.Server(
-                async_mode='threading', cors_allowed_origins='*')
-            # Create a WSGI app with the Socket.IO middleware
-            sio_app = sio.WSGIApp(sio_server, app)
-
-            # Run with Waitress
-            serve(sio_app, host=host, port=port, threads=4)
+            print("🔄 Using Gunicorn with eventlet for WebSocket support...")
+            
+            # Build the Gunicorn command
+            cmd = [
+                'gunicorn',
+                '--worker-class', 'eventlet',
+                '-w', '1',  # Number of workers
+                '-b', f'{host}:{port}',
+                '--log-level', 'info',
+                '--timeout', '120',
+                'web_app:app'
+            ]
+            
+            # Start the server
+            subprocess.run(cmd)
         else:
             # In development, use the default Flask-SocketIO server
             socketio.run(
