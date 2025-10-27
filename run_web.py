@@ -11,6 +11,8 @@ import time
 import threading
 import torch
 from web_app import app, socketio
+from waitress import serve
+import socketio as sio
 
 # Set environment variables for better performance
 os.environ['CUDA_LAUNCH_BLOCKING'] = '0'
@@ -60,15 +62,26 @@ def main():
     print("=" * 50)
 
     try:
-        # Run the Flask-SocketIO app
-        socketio.run(
-            app,
-            debug=not is_production,
-            host=host,
-            port=port,
-            use_reloader=False,
-            log_output=True
-        )
+        if is_production:
+            # In production, use Waitress for WSGI and Socket.IO with threading
+            print(f"🚀 Starting production server on port {port}...")
+            
+            # Create a Socket.IO server
+            sio = sio.Server(async_mode='threading', cors_allowed_origins='*')
+            sio_app = sio.WSGIApp(sio, app)
+            
+            # Run with Waitress
+            serve(sio_app, host=host, port=port, threads=4)
+        else:
+            # In development, use the default Flask-SocketIO server
+            socketio.run(
+                app,
+                debug=True,
+                host=host,
+                port=port,
+                use_reloader=False,
+                log_output=True
+            )
     except KeyboardInterrupt:
         print("\n👋 Shutting down Audio Separator Pro...")
         sys.exit(0)
